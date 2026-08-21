@@ -1,0 +1,66 @@
+# Genomic data — never commit
+*.bam
+*.bai
+*.cram
+*.crai
+*.fastq
+*.fastq.gz
+*.fq
+*.fq.gz
+*.fasta
+*.fa
+*.fa.gz
+*.fai
+*.jf
+*.gfa
+*.paf
+*.sam
+*.vcf
+*.vcf.gz
+*.bed
+
+# Results and data directories
+pedigree_results/
+hprc_results/
+pedigree_assemblies/
+hprc_assemblies/
+pedigree_reads/
+cohort_bams/
+/reference/
+assemblies/
+
+# Logs
+logs/
+slurm-*.out
+*.out
+*.err
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Local config (has institution-specific paths)
+config.env
+
+# Editor / OS
+.DS_Store
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Temp files
+*.tmp
+*.temp
