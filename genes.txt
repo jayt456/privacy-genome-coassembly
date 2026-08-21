@@ -1,0 +1,23 @@
+# Gene list for multi-gene alignment pipeline
+# Columns: GENE  CHROM  GENE_START  GENE_END  FLANK_START  FLANK_END
+#
+# GENE_START/GENE_END  — exact gene boundaries; input to ffind.py
+# FLANK_START/FLANK_END — expanded region with flanking anchors; output from ffind.py;
+#                         used by extract_region.sh and alignment scripts
+#
+# To add a gene:
+#   1. Add a row with exact gene coords; set FLANK = rough window if ffind.py not yet run
+#   2. Once hg38_orig_reference.k15.jf exists, run ffind.py to get principled flank coords
+#   3. Update FLANK_START/FLANK_END with ffind.py output
+#   4. Run: bash scripts/extract_region.sh <GENE> <CHROM>:<FLANK_START>-<FLANK_END>
+#   5. Run: bash scripts/submit_align_{pedigree,hprc}.sh <GENE>
+#
+# GENE    CHROM   GENE_START  GENE_END    FLANK_START  FLANK_END
+CYP2D6	chr22	42126499	42130810	41983509	42269959
+TERT	chr5	1253147		1295068		1186033		1371812
+TCF3	chr19	1609290		1652615		1525600		1749816
+SLC6A3	chr5	1392794		1445440		1318105		1511314
+LMF1	chr16	853634		981318		794014		1040403
+IGH	chr14	105586437	106879844	105484613	106883718
+KIR	chr19	54816468	54830778	54631973	55015162
+HLA	chr6	25726063	33400644	25576036	33521605
