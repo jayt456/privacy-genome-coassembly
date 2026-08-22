@@ -6,6 +6,9 @@ Many medically important genomic regions — pharmacogenes, immune receptor clus
 
 Current work focuses on **gene-region subgraph extraction**: given a whole-genome hifiasm assembly, accurately isolating just the segments corresponding to a target gene using genome-unique k-mers. This is the foundation for co-assembly across samples.
 
+Our end goal involves developing some privacy-preserving k-mer index which could handle queries during assembly to help resolve ambiguities and retain sequences observed in other samples (avoiding mistaking them as errors, thus improving coverage of the raw sequencing data, resulting in higher quality assembler output). This, broadly, could be more useful than just pooling reads from separate samples.
+
+
 ---
 
 ## Project Status
