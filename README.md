@@ -189,5 +189,5 @@ Traces hifiasm's internal A-lines — contig-to-reference BAM → p_ctg A-lines 
 
 ## Contact
 
-Jay Tummala — jay.tummala@yale.edu &nbsp;·&nbsp; Hoon Cho — hoon.cho@yale.edu  
+Jay Tummala — jay.tummala@yale.edu &nbsp;·&nbsp; 
 Yale BIDS / Yale Computer Science
