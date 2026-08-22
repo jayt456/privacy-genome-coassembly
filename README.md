@@ -1,20 +1,10 @@
 # Privacy-Preserving Genomic Co-Assembly
 
-Some genomic regions are medically critical but too complex to assemble well from a single institution's data. This project builds a system that lets multiple institutions identify shared sequence at these regions and cooperate to assemble them better — without any raw genomic data ever crossing institutional boundaries.
-
 **PI:** Hoon Cho (Yale BIDS / Yale CS) &nbsp;·&nbsp; **Student:** Jay Tummala (Yale CS)
 
----
+Many medically important genomic regions — pharmacogenes, immune receptor clusters, copy-number variable loci — are too structurally complex to assemble well from a single institution's data. This project investigates whether multiple institutions can identify shared sequence at these regions from low-coverage long reads and cooperatively assemble them better, without exposing raw genomic data.
 
-## What is this?
-
-Many important genes — drug-metabolism enzymes, immune receptor clusters, disease-linked structural variants — sit in regions of the genome so repetitive and structurally variable that assembling them accurately requires more samples than any single institution has. The natural solution is collaboration across hospitals and research centers, but raw genomic reads are personally identifiable and legally protected.
-
-This project's answer: compress each institution's reads into compact mathematical fingerprints, add carefully calibrated noise for differential privacy, and use a cryptographic protocol (MHE-PSI) to find which samples share sequence at a target gene — without either institution ever seeing the other's data. Once matched, they co-assemble the region from pooled reads, recovering assembly quality that neither could achieve alone.
-
-The longer-term goal is a **privacy-preserving sequence index** queryable during assembly itself: rather than pooling reads, an assembler could query what other institutions observed at ambiguous positions to resolve gaps and avoid discarding real sequence as apparent errors.
-
-This repository contains the **Python tools and primary extraction pipeline** for the assembly side: gene-specific subgraph extraction from whole-genome hifiasm assemblies using genome-unique k-mers, validated across 58 samples and 8 complex gene loci. The privacy layer (sketching → DP → MHE-PSI) builds on top of this.
+Current work focuses on **gene-region subgraph extraction**: given a whole-genome hifiasm assembly, accurately isolating just the segments corresponding to a target gene using genome-unique k-mers. This is the foundation for co-assembly across samples.
 
 ---
 
@@ -27,16 +17,16 @@ This repository contains the **Python tools and primary extraction pipeline** fo
 | Gene-region subgraph extraction — k=21 method | ✅ Complete |
 | HG002 validation against Q100 ground truth | ✅ Complete |
 | Subgraph extraction — full cohort (58 × 8 genes) | 🔄 In progress |
-| Minimizer sketching of subgraphs | 📋 Planned |
-| Differential privacy layer (randomized response) | 📋 Planned |
-| MHE-PSI inter-institutional comparison | 📋 Planned |
-| Co-assembly evaluation (NGA50 / QV vs. epsilon) | 📋 Planned |
+| Co-assembly methods and evaluation | 📋 Planned |
+| Privacy layer (differential privacy via randomized response) | 📋 Planned |
 
 ---
 
 ## Key Results
 
-**The k=15 → k=21 pivot.** Initial 15-mer scoring produced 7–11 segments per assembly at CYP2D6 — too many. The cause: CYP2D6 has two near-identical pseudogenes (CYP2D7/CYP2D8) sharing >90% sequence identity, so 15-mers from CYP2D6 recurred in pseudogenes and were incorrectly labeled unique. At k=21, a single nucleotide difference anywhere in the 21-mer window is enough to distinguish CYP2D6 from its paralogs completely.
+The core challenge is extracting gene-region segments from a whole-genome assembly graph containing tens of thousands of segments. We score each segment by how many genome-unique k-mers from the target gene it contains, keeping only high-scoring ones.
+
+**The k=15 → k=21 pivot.** Initial 15-mer scoring produced 7–11 segments per assembly at CYP2D6 — too many. The cause: CYP2D6 has two near-identical pseudogenes (CYP2D7/CYP2D8) sharing >90% sequence identity, so 15-mers from CYP2D6 recurred in pseudogenes and were incorrectly labeled unique. At k=21, a single nucleotide difference anywhere in the window is enough to distinguish CYP2D6 from its paralogs.
 
 **CYP2D6 method comparison (HG002):**
 
@@ -49,7 +39,7 @@ This repository contains the **Python tools and primary extraction pipeline** fo
 | Read-tracing (A-lines) | high-cov | 4 | 7.55 Mb | ✓ correct reads, chromosome-scale UTGs |
 | Boundary v2 (CIGAR) | high-cov | 2 | 1.14 Mb | ✓ matches k=21 exactly |
 
-Three independent methods agree on the same 2 segments for the high-coverage assembly, confirmed against the HG002 Q100 ground-truth reference. The 12× assembly fragments to 4 segments — illustrating the problem co-assembly is meant to solve.
+Three independent methods agree on the same segments for HG002, confirmed against the Q100 ground-truth reference. The 12× assembly fragments to 4 segments — illustrating exactly the problem co-assembly is meant to address.
 
 **All 8 genes (HG002, 12× assembly):**
 
@@ -66,9 +56,16 @@ Three independent methods agree on the same 2 segments for the high-coverage ass
 
 ---
 
+## Future Directions
+
+- **Co-assembly:** pool extracted subgraph reads from matched samples across institutions and evaluate whether co-assembled output improves on any single institution's 12× assembly (NGA50, QV, haplotype completeness)
+- **Privacy layer:** differential privacy via randomized response to allow institutions to compare sequence without exposing raw reads
+
+---
+
 ## Gene Panel
 
-8 medically relevant genes chosen for structural complexity. Coordinates in `genes.txt`.
+8 medically relevant genes, chosen for structural complexity. Coordinates in `genes.txt`.
 
 | Gene | Chrom | Flank window | Role |
 |------|-------|-------------|------|
@@ -91,7 +88,7 @@ Flank windows computed by `src/ffind.py` (k=15, t=1, m=10,000): each side contai
 - HiFi reads: `s3://platinum-pedigree-data/data/hifi/mapped/GRCh38/<sample>.GRCh38.haplotagged.bam`
 - High-coverage assemblies: `s3://platinum-pedigree-data/assemblies/`
 
-**HPRC Year 1** — 47 samples
+**HPRC Year 1** — 47 samples  
 - HiFi reads: `s3://human-pangenomics/working/HPRC[_PLUS]/<sample>/analysis/aligned_reads/hifi/GRCh38/<sample>_aligned_GRCh38_winnowmap.sorted.bam`
 - Assemblies: `s3://human-pangenomics/working/HPRC[_PLUS]/<sample>/assemblies/year1_freeze_assembly_v2/`
 
@@ -114,47 +111,30 @@ conda create -n biotools -c bioconda -c conda-forge jellyfish biopython python=3
 conda activate biotools
 ```
 
-Pipeline scripts use three environment variables (Yale HPC defaults are built in):
-
+Set paths in `config.env` (copy from `config.env.example`):
 ```bash
-export COASM_BASE=/path/to/project       # assemblies, results, reference files
-export COASM_SCRATCH=/path/to/scratch    # large transient outputs
-export COASM_TOOLS=/path/to/repo/src     # Python tools directory
+export COASM_BASE=/path/to/project
+export COASM_SCRATCH=/path/to/scratch
+export COASM_TOOLS=/path/to/repo/src
 ```
-
-Copy `config.env.example` → `config.env` and fill in your paths.
 
 ---
 
 ## Quick Start
 
-### 1. Clone and configure
+### 1. Build genome-unique k-mer files (one-time)
 ```bash
-git clone https://github.com/jayt456/privacy-genome-coassembly
-cd privacy-genome-coassembly
-cp config.env.example config.env
-# edit config.env with your paths
-```
-
-### 2. Build genome-unique k-mer files (one-time, ~2–3 hrs)
-
-Build a Jellyfish k=21 database from hg38, then run `ffind.py` for each gene:
-
-```bash
-# Build k=21 Jellyfish DB (~22 GB)
+# k=21 Jellyfish database from hg38 (~22 GB)
 jellyfish count -m 21 -s 10G -t 16 -o hg38.k21.jf hg38.fasta
 
-# Get genome-unique 21-mers for a gene
+# Genome-unique 21-mers for a gene
 python src/ffind.py hg38.fasta chr22 42126499 42130810 \
     -k 21 -t 1 -m 10000 \
     --db hg38.k21.jf \
     --output-kmers hg38CYP2D6.unique_k21.txt
 ```
 
-### 3. Assemble at 12× and extract subgraphs
-
-Run hifiasm on your 12× FASTQ, then score and extract:
-
+### 2. Assemble and extract subgraph
 ```bash
 hifiasm -o sample.bp -t 16 sample.12x.fastq.gz
 
@@ -174,82 +154,37 @@ For cohort-scale extraction across many samples and genes, see `pipeline/subgrap
 
 ### `ffind.py` — Flanking anchor finder
 
-Walks outward from a gene body until each flank contains ≥m k-mers appearing at most t times genome-wide in a Jellyfish database. Emits the unique k-mers as a flat text file for use with `gfa_k21.py`.
+Walks outward from a gene body until each flank contains ≥m k-mers appearing at most t times genome-wide. Emits the unique k-mer list used by `gfa_k21.py`.
 
-> **Key fix:** Jellyfish built without `-C` (canonical flag) stores only one strand. Querying only the forward k-mer gives false positives — k-mers whose reverse complement is common genome-wide look unique. `ffind.py` queries both strands and requires `fwd_count + RC_count ≤ t`.
-
-```
-usage: ffind.py ref.fasta CHROM START END [-k K] [-t T] [-m M] --db JF_DB [--output-kmers FILE]
-```
-
----
+> **Note on Jellyfish strand handling:** a database built without `-C` stores only one strand. `ffind.py` queries both the forward k-mer and its reverse complement, requiring `fwd_count + RC_count ≤ t` — otherwise k-mers whose complement is common genome-wide appear falsely unique.
 
 ### `gfa_k21.py` — GFA subgraph scorer
 
-Scores every segment in a hifiasm `p_utg.gfa` against a genome-unique k-mer set. A segment passes if `hits / |ref_kmers| × 100 > threshold` (default 1%). Prints passing segment IDs to stdout for piping to `gfatools view`.
+Scores every segment in a hifiasm `p_utg.gfa` against the genome-unique k-mer set. A segment passes if `hits / |ref_kmers| × 100 > threshold` (default 1%). Prints passing segment IDs to stdout for piping to `gfatools view`.
 
-```
-usage: gfa_k21.py GFA --kmers KMER_FILE [--threshold FLOAT] [--k INT]
-```
+### `filter_reads_by_kmers.py` — Read pre-filter
 
----
-
-### `filter_reads_by_kmers.py` — Read pre-filter for targeted assembly
-
-Filters a FASTQ to reads containing ≥1 genome-unique k-mer. Enables targeted hifiasm on just the gene-matching reads. At 12×, ~0.016% of whole-genome HiFi reads match CYP2D6 (358 of 2.2M for HG002); the targeted assembly produces fewer, cleaner fragments.
-
-```
-usage: filter_reads_by_kmers.py --fastq FASTQ --kmers KMER_FILE --out OUTPUT
-```
-
----
+Filters a FASTQ to reads containing ≥1 genome-unique k-mer, enabling targeted hifiasm on just gene-matching reads. For HG002 CYP2D6: 358 of 2.2M reads passed (0.016%), yielding a 3-segment / 128 kb targeted assembly vs. 4 segments / 585 kb whole-genome baseline.
 
 ### `trace_reads.py` — A-line read tracer *(methodology reference)*
 
-> **Note:** Included for methodology documentation, not general use. Requires a Q100 ground-truth reference (e.g. GIAB HG002 CYP2D6 sequences) to produce the contig-to-reference BAM used as input. Used to independently validate k=21 results for HG002. For general subgraph extraction, use `gfa_k21.py`.
+> **Note:** Requires a Q100 ground-truth reference (used here for HG002 validation only). For general subgraph extraction use `gfa_k21.py`.
 
-Traces A-lines through hifiasm's internal graph bookkeeping: contig-to-reference BAM → p_ctg A-lines → HiFi read names → p_utg A-lines → unitig names. All three independent methods (k=21 scoring, A-line tracing, CIGAR boundary parsing) agreed on the same segments for HG002.
-
-```
-usage: trace_reads.py --bam BAM --ctg-gfa P_CTG_GFA --utg-gfa P_UTG_GFA
-```
-
----
-
-## Cohort Extraction Script
-
-`pipeline/subgraph/run_gfa_subset.sh` is the SLURM wrapper for running `gfa_k21.py` across all samples and all genes in `genes.txt`. It reads gene names and coordinates dynamically, skips completed outputs, and handles both pedigree and HPRC datasets.
-
-```bash
-sbatch pipeline/subgraph/run_gfa_subset.sh hprc      # 47 HPRC samples × 8 genes
-sbatch pipeline/subgraph/run_gfa_subset.sh pedigree  # 11 pedigree samples × 8 genes
-sbatch pipeline/subgraph/run_gfa_subset.sh both       # all 58 samples
-```
-
-Output per sample-gene: `<sample>.<GENE>.k21.subset.gfa` + `<sample>.<GENE>.k21.segments`.
+Traces hifiasm's internal A-lines — contig-to-reference BAM → p_ctg A-lines → read names → p_utg A-lines → unitig names — as an independent check on k=21 results.
 
 ---
 
 ## Archive
 
-[`archive/gfa_k15.py`](archive/gfa_k15.py) is the k=15 predecessor to `gfa_k21.py`, kept to document why k=15 fails at pharmacogene loci. The scoring logic is identical; only the k-mer length differs. Running it on CYP2D6 produces 7–11 segments due to CYP2D7/CYP2D8 paralog contamination — the result that motivated the switch to k=21.
-
----
-
-## Adding a New Gene
-
-1. Add a row to `genes.txt` with gene body coordinates
-2. Build a genome-unique k-mer file with `ffind.py` (see Quick Start step 2)
-3. Run `gfa_k21.py` or `run_gfa_subset.sh` with the new gene
+[`archive/gfa_k15.py`](archive/gfa_k15.py) is the k=15 predecessor to `gfa_k21.py`. Kept to document why k=15 fails: running it on CYP2D6 produces 7–11 segments due to CYP2D7/CYP2D8 paralog contamination, motivating the switch to k=21.
 
 ---
 
 ## Citation
 
-> Jay Tummala, Hoon Cho. Privacy-Preserving Genomic Co-Assembly at Complex Loci Using Genome-Unique K-mer Subgraph Extraction. *In preparation*, 2026.
+> Jay Tummala, Hoon Cho. Privacy-Preserving Genomic Co-Assembly at Complex Loci. *In preparation*, 2026.
 
 ## Contact
 
-Jay Tummala — jay.tummala@yale.edu  
-PI: Hoon Cho — hoon.cho@yale.edu  
+Jay Tummala — jay.tummala@yale.edu &nbsp;·&nbsp; Hoon Cho — hoon.cho@yale.edu  
 Yale BIDS / Yale Computer Science
