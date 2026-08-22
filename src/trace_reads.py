@@ -2,6 +2,12 @@
 """
 trace_reads.py: GFA subgraph extraction by A-line read tracing.
 
+NOTE: This script is included for methodology documentation, not general use.
+It requires a Q100 ground-truth reference (e.g. GIAB HG002 CYP2D6 pat/mat sequences)
+to produce the contig-to-reference BAM used as input. It was used to independently
+validate k=21 subgraph results for HG002 and confirmed agreement on the same segments.
+For general subgraph extraction, use gfa_k21.py instead.
+
 Implements Baris's approach: given a contig-to-reference BAM, identify which
 unitig segments in a p_utg.gfa cover the same locus.
 
